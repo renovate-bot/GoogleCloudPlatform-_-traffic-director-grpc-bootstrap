@@ -153,6 +153,16 @@ func main() {
 			"GCP-ZONE":    zone,
 			"INSTANCE-IP": ip,
 		}
+	case deploymentTypeCloudRun:
+		instanceID, err := getCloudRunInstanceID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating Cloud Run deployment info: %s\n", err)
+			os.Exit(1)
+		} else {
+			deploymentInfo = map[string]string{
+				"INSTANCE-ID": instanceID,
+			}
+		}
 	}
 
 	meshID := *configMesh
@@ -456,6 +466,14 @@ func getVMName() string {
 		return ""
 	}
 	return string(vm)
+}
+
+func getCloudRunInstanceID() (string, error) {
+	instanceID, err := getFromMetadata("http://metadata.google.internal/computeMetadata/v1/instance/id")
+	if err != nil {
+		return "", fmt.Errorf("failed to determine instance id: %v", err)
+	}
+	return string(instanceID), nil
 }
 
 // isIPv6Capable returns true if the VM is configured with an IPv6 address.

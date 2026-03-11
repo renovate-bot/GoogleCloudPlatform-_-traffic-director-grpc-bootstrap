@@ -881,6 +881,52 @@ func TestGetClusterLocality(t *testing.T) {
 	}
 }
 
+func TestGetCloudRunInstanceID(t *testing.T) {
+	tests := []struct {
+		desc    string
+		handler func(http.ResponseWriter, *http.Request)
+		want    string
+		wantErr bool
+	}{
+		{
+			desc: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Metadata-Flavor") != "Google" {
+					http.Error(w, "Missing Metadata-Flavor", http.StatusForbidden)
+					return
+				}
+				w.Write([]byte("instance-id-123"))
+			},
+			want: "instance-id-123",
+		},
+		{
+			desc: "server_returns_403",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "Error", http.StatusForbidden)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.HandleFunc("metadata.google.internal/computeMetadata/v1/instance/id", tt.handler)
+			server := httptest.NewServer(mux)
+			defer server.Close()
+			overrideHTTP(server)
+
+			got, err := getCloudRunInstanceID()
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("getCloudRunInstanceID() returned error: %v wantErr: %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Fatalf("getCloudRunInstanceID() = %s want: %s", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetVMName(t *testing.T) {
 	server := httptest.NewServer(nil)
 	defer server.Close()
